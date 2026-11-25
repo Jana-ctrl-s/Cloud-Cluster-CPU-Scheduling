@@ -1,15 +1,18 @@
 import java.util.List;
 import java.util.Locale;
 
-public class RunSJF {
-    Scheduler[] schedulers = { new SJFScheduler(), new ACS() };
+public class Main {
+    public static void main(String[] args) {
+        Scheduler[] schedulers = { new SJFScheduler(), new ACS() };
+
         for (Scheduler scheduler : schedulers) {
             run(scheduler, "Test Case 1", TestCases.testCase1(), 3, 0);
             run(scheduler, "Test Case 2", TestCases.testCase2(), 3, 1);
             run(scheduler, "My Test Case", TestCases.myTestCase(), 2, 1);
         }
+    }
 
-    static void run(String title, List<Process> processes, int q, int cs) {
+    static void run(Scheduler scheduler, String title, List<Process> processes, int q, int cs) {
         SimulationResult result = scheduler.run(processes, q, cs);
         System.out.println(result.algorithm + " - " + title + " (Q = " + q + ", CS = " + cs + ")");
         System.out.println();
