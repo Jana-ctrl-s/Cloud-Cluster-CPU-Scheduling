@@ -1,74 +1,101 @@
-import javax.swing.JFrame;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.Graphics;
+import javax.swing.*;
+import java.awt.*;
+import java.util.List;
+import java.util.Locale;
 
 public class GanttPanel extends JPanel {
-    private static final int UNIT = 30;
-    private static final int LEFT = 20;
-    private static final int TOP = 30;
-    private static final int HEIGHT = 40;
-    private SimulationResult result;
-    public GanttPanel() {
+    static Color[] COLORS = { new Color(135, 206, 250), new Color(144, 238, 144), new Color(255, 218, 120),
+            new Color(255, 160, 160), new Color(200, 170, 240), new Color(120, 220, 210) };
+    SimulationResult r;
+    int end;
+
+    GanttPanel(SimulationResult r) {
+        this.r = r;
+        end = r.slices.get(r.slices.size() - 1).end;
         setBackground(Color.WHITE);
+        setPreferredSize(new Dimension(40 + end * 30, 90));
     }
 
-    public void setResult(SimulationResult result) {
-        this.result = result;
-        int endTime = 0;
-        if (result != null && !result.slices.isEmpty()) {
-            endTime = result.slices.get(result.slices.size() - 1).end;
-        }
-        setPreferredSize(new Dimension(LEFT * 2 + endTime * UNIT + 10, TOP + HEIGHT + 50));
-        revalidate();
-        repaint();
-    }
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        if (result == null || result.slices.isEmpty()) {
+        for (Slice s : r.slices) {
+            int x = 20 + s.start * 30, w = (s.end - s.start) * 30;
+            g.setColor(s.label.equals("CS") ? Color.LIGHT_GRAY : COLORS[Math.abs(s.label.hashCode()) % COLORS.length]);
+            g.fillRect(x, 20, w, 40);
             g.setColor(Color.BLACK);
-            g.drawString("No result yet. Press Run.", LEFT, TOP);
-            return;
+            g.drawRect(x, 20, w, 40);
+            g.drawString(s.label, x + w / 2 - 8, 45);
+            g.drawString("" + s.start, x - 4, 78);
         }
-
-        int endTime = 0;
-        for (Slice s : result.slices) {
-            int x = LEFT + s.start * UNIT;
-            int width = (s.end - s.start) * UNIT;
-
-            g.setColor(colorFor(s.label));
-            g.fillRect(x, TOP, width, HEIGHT);
-            g.setColor(Color.BLACK);
-            g.drawRect(x, TOP, width, HEIGHT);
-            g.drawString(s.label, x + width / 2 - 8, TOP + HEIGHT / 2 + 5);
-            g.drawString("" + s.start, x - 4, TOP + HEIGHT + 18);
-            endTime = s.end;
-        }
-        g.drawString("" + endTime, LEFT + endTime * UNIT - 4, TOP + HEIGHT + 18);
+        g.drawString("" + end, 16 + end * 30, 78);
     }
 
-    private Color colorFor(String label) {
-        if (label.equals("CS")) {
-            return Color.LIGHT_GRAY;
+    static String report(SimulationResult r, boolean twoTier) {
+        String t = "";
+        double tat = 0, wait = 0;
+        for (Process p : r.finished) {
+            int ta = p.finishTime - p.arrival, w = ta - p.burst;
+            tat += ta;
+            wait += w;
+            t += p.id + ": finish " + p.finishTime + ", turnaround " + ta + ", waiting " + w
+                    + ", response " + (p.firstRunTime - p.arrival) + "\n";
         }
-        Color[] colors = {
-                new Color(135, 206, 250), new Color(144, 238, 144), new Color(255, 218, 120),
-                new Color(255, 160, 160), new Color(200, 170, 240), new Color(120, 220, 210)
-        };
-        return colors[Math.abs(label.hashCode()) % colors.length];
+        int n = r.finished.size();
+        t += String.format(Locale.US, "\nAverage Turnaround Time: %.2f\nAverage Waiting Time: %.2f\n\n", tat / n, wait / n);
+        for (Snapshot s : r.snapshots)
+            t += "Time " + s.time + ": running " + s.running
+                    + (twoTier ? ", Tier 1 " + s.tier1 + ", Tier 2 " + s.tier2 : ", Ready " + s.tier1) + "\n";
+        return t;
     }
+
     public static void main(String[] args) {
-        SimulationResult result = new SJFScheduler().run(TestCases.testCase2(), 3, 1);
+        Scheduler[] algos = { new SJFScheduler(), new ACS() };
+        JComboBox<String> box = new JComboBox<>(new String[] { "Test Case 1", "Test Case 2", "My Test Case", "My Test Case P2" });
+        JTextField qField = new JTextField("3", 3), csField = new JTextField("0", 3);
+        JButton run = new JButton("Run");
+        JPanel center = new JPanel(new GridLayout(1, 2, 8, 0));
+        JPanel[] cols = { new JPanel(new GridLayout(2, 1)), new JPanel(new GridLayout(2, 1)) };
+        for (int i = 0; i < 2; i++) {
+            cols[i].setBorder(BorderFactory.createTitledBorder(i == 0 ? "SJF" : "ACS"));
+            center.add(cols[i]);
+        }
 
-        GanttPanel panel = new GanttPanel();
-        panel.setResult(result);
+        run.addActionListener(e -> {
+            int q, cs;
+            try {
+                q = Integer.parseInt(qField.getText().trim());
+                cs = Integer.parseInt(csField.getText().trim());
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(null, "Q and CS must be whole numbers.");
+                return;
+            }
+            int k = box.getSelectedIndex();
+            List<Process> ps = k == 0 ? TestCases.testCase1() : k == 1 ? TestCases.testCase2()
+                    : k == 2 ? TestCases.myTestCase() : TestCases.myTestCaseP2();
+            for (int i = 0; i < 2; i++) {
+                SimulationResult r = algos[i].run(ps, q, cs);
+                JTextArea text = new JTextArea(report(r, i == 1));
+                text.setEditable(false);
+                text.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+                cols[i].removeAll();
+                cols[i].add(new JScrollPane(new GanttPanel(r)));
+                cols[i].add(new JScrollPane(text));
+                cols[i].revalidate();
+                cols[i].repaint();
+            }
+        });
 
-        JFrame frame = new JFrame("Gantt chart - SJF, Test Case 2 (CS = 1)");
-        frame.add(new JScrollPane(panel));
-        frame.setSize(700, 200);
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setVisible(true);
+        JPanel top = new JPanel();
+        top.add(new JLabel("Test case:")); top.add(box);
+        top.add(new JLabel("Q:")); top.add(qField);
+        top.add(new JLabel("CS:")); top.add(csField);
+        top.add(run);
+
+        JFrame f = new JFrame("CPU Scheduling Simulator");
+        f.add(top, BorderLayout.NORTH);
+        f.add(center);
+        f.setSize(1200, 650);
+        f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        f.setVisible(true);
     }
 }
