@@ -2,21 +2,22 @@ import java.util.List;
 import java.util.Locale;
 
 public class RunSJF {
-    public static void main(String[] args) {
-        run("Test Case 1", TestCases.testCase1(), 3, 0);
-        run("Test Case 2", TestCases.testCase2(), 3, 1);
-        run("My Test Case", TestCases.myTestCase(), 2, 1);
-    }
+    Scheduler[] schedulers = { new SJFScheduler(), new ACS() };
+        for (Scheduler scheduler : schedulers) {
+            run(scheduler, "Test Case 1", TestCases.testCase1(), 3, 0);
+            run(scheduler, "Test Case 2", TestCases.testCase2(), 3, 1);
+            run(scheduler, "My Test Case", TestCases.myTestCase(), 2, 1);
+        }
 
     static void run(String title, List<Process> processes, int q, int cs) {
-        System.out.println("SJF - " + title + " (Q = " + q + ", CS = " + cs + ")");
+        SimulationResult result = scheduler.run(processes, q, cs);
+        System.out.println(result.algorithm + " - " + title + " (Q = " + q + ", CS = " + cs + ")");
         System.out.println();
-        SimulationResult result = new SJFScheduler().run(processes, q, cs);
         System.out.println("Gantt: " + result.slices);
         System.out.println();
 
         for (Snapshot s : result.snapshots) {
-            System.out.println("Time " + s.time + ": running " + s.running + ", waiting " + s.tier1);
+            System.out.println("Time " + s.time + ": running " + s.running + ", Tier 1 " + s.tier1 + ", Tier 2 " + s.tier2);
         }
         System.out.println();
 

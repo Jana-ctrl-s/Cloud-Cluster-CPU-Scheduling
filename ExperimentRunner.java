@@ -6,13 +6,14 @@ import java.util.Locale;
 
 public class ExperimentRunner {
     public static void main(String[] args) throws IOException {
-        Scheduler scheduler = new SJFScheduler();
-        runExperiment(scheduler, "testcase1", TestCases.testCase1());
-        runExperiment(scheduler, "testcase2", TestCases.testCase2());
-        runExperiment(scheduler, "mytestcase", TestCases.myTestCase());
-    }
+        Scheduler[] schedulers = { new SJFScheduler(), new ACS() };
+        for (Scheduler scheduler : schedulers) {
+            runExperiment(scheduler, "testcase1", TestCases.testCase1());
+            runExperiment(scheduler, "testcase2", TestCases.testCase2());
+            runExperiment(scheduler, "mytestcase", TestCases.myTestCase());
+        }
     static void runExperiment(Scheduler scheduler, String name, List<Process> processes) throws IOException {
-        String fileName = "experiment_" + name + ".csv";
+            String fileName = "experiment_" + scheduler.run(processes, 1, 0).algorithm + "_" + name + ".csv";
         PrintWriter out = new PrintWriter(new FileWriter(fileName));
         out.println("Q,CS,AvgWaiting,AvgTurnaround");
 
